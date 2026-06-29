@@ -40,19 +40,20 @@ function tester(path, body, method) {
 }
 
 async function lancerTests() {
-  console.log('Demarrage des tests...\n');
+  console.log('Test Module Finance...\n');
 
-  // Test 1 - Nouvelle commande (nouvel ID)
-  await tester('/webhooks/shopify-order', {
-    id: 22222,
-    phone: '0771234567',
-    email: 'nouveau@gmail.com',
-    total_price: '5000',
-    shipping_address: { phone: '0771234567' },
-    note_attributes: []
+  // REMPLACE ICI PAR TON VRAI ID
+  const COMMANDE_ID = 'db9647a8-9f8c-43b4-9bc8-d9d0817c9ede';
+
+  // Test calcul profit
+  await tester('/finance/calculer', {
+    commande_id: COMMANDE_ID,
+    cout_produit: 1500,
+    cout_pub: 800,
+    cout_livraison: 400
   });
 
-  // Test 2 - Resume finance
+  // Test resume global
   await tester('/finance/resume', {}, 'GET');
 
   console.log('Tests termines !');
