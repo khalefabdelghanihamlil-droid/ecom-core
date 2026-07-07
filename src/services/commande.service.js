@@ -263,7 +263,7 @@ if (clientError) {
     }
 
     // 4. Moteur Anti-Fraude (Fraud Engine)
-    cconsole.log("Avant Fraud Engine");
+    console.log("Avant Fraud Engine");
 
 const result = await fraudEngine.evaluateFraudRisk(
     client,
