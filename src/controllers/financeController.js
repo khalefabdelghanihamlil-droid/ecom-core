@@ -1,4 +1,4 @@
-const { calculerProfit, getResumeFinance } = require('../services/financeService');
+const { calculerProfit, getResumeFinanceDetaille, getProfitParProduit, getProfitEvolution } = require('../services/financeService');
 
 async function enregistrerProfit(req, res) {
   try {
@@ -28,7 +28,7 @@ async function enregistrerProfit(req, res) {
 
 async function resumeFinance(req, res) {
   try {
-    const resume = await getResumeFinance();
+    const resume = await getResumeFinanceDetaille();
     return res.status(200).json(resume);
   } catch (err) {
     console.log('Erreur resume: ' + err.message);
@@ -36,4 +36,23 @@ async function resumeFinance(req, res) {
   }
 }
 
-module.exports = { enregistrerProfit, resumeFinance };
+async function profitParProduit(req, res) {
+    try {
+        const data = await getProfitParProduit();
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(500).json({ message: err.message });
+    }
+}
+
+async function profitEvolution(req, res) {
+    try {
+        const jours = parseInt(req.query.jours) || 30;
+        const data = await getProfitEvolution(jours);
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(500).json({ message: err.message });
+    }
+}
+
+module.exports = { enregistrerProfit, resumeFinance, profitParProduit, profitEvolution };

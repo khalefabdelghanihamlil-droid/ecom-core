@@ -49,7 +49,7 @@ async function calculerProfit(commandeId, coutProduit, coutPub, coutLivraison) {
   }
 }
 
-async function getResumeFinance() {
+async function getResumeFinanceDetaille() {
   try {
     const { data: finances } = await supabase
       .from('finance')
@@ -60,27 +60,45 @@ async function getResumeFinance() {
         total_ca: 0,
         total_profit: 0,
         total_commandes: 0,
-        marge_moyenne: 0
+        marge_moyenne: 0,
+        roas_global: 0,
+        couts: { produit: 0, pub: 0, livraison: 0 }
       };
     }
 
-    const total_ca = finances.reduce(function(sum, f) {
-      return sum + parseFloat(f.commande.montant || 0);
-    }, 0);
+    let total_ca = 0;
+    let cout_produit_total = 0;
+    let cout_pub_total = 0;
+    let cout_livraison_total = 0;
 
-    const total_profit = finances.reduce(function(sum, f) {
-      return sum + parseFloat(f.profit_net || 0);
-    }, 0);
+    finances.forEach(function(f) {
+        total_ca += parseFloat(f.commande.montant || 0);
+        cout_produit_total += parseFloat(f.cout_produit || 0);
+        cout_pub_total += parseFloat(f.cout_pub || 0);
+        cout_livraison_total += parseFloat(f.cout_livraison || 0);
+    });
+
+    const total_profit = total_ca - cout_produit_total - cout_pub_total - cout_livraison_total;
 
     const marge_moyenne = total_ca > 0
       ? ((total_profit / total_ca) * 100).toFixed(2)
       : 0;
 
+    const roas_global = cout_pub_total > 0
+        ? (total_ca / cout_pub_total).toFixed(2)
+        : total_ca > 0 ? "∞" : 0;
+
     return {
       total_ca: total_ca.toFixed(2),
       total_profit: total_profit.toFixed(2),
       total_commandes: finances.length,
-      marge_moyenne: marge_moyenne
+      marge_moyenne: marge_moyenne,
+      roas_global: roas_global,
+      couts: {
+          produit: cout_produit_total.toFixed(2),
+          pub: cout_pub_total.toFixed(2),
+          livraison: cout_livraison_total.toFixed(2)
+      }
     };
 
   } catch (err) {
@@ -88,4 +106,75 @@ async function getResumeFinance() {
   }
 }
 
-module.exports = { calculerProfit, getResumeFinance };
+// Fonction utilitaire obsolète, redirige vers la nouvelle
+async function getResumeFinance() {
+    return getResumeFinanceDetaille();
+}
+
+
+async function getProfitParProduit() {
+    try {
+        const { data: finances } = await supabase
+            .from('finance')
+            .select('profit_net, cout_produit, cout_pub, cout_livraison, commande:commande_id(montant, product_id, product:product_id(nom))');
+
+        const produits = {};
+
+        finances.forEach(f => {
+            const pId = f.commande.product_id;
+            const pNom = f.commande.product ? f.commande.product.nom : 'Produit inconnu';
+
+            if (pId) {
+                if (!produits[pId]) {
+                    produits[pId] = { id: pId, nom: pNom, ca: 0, profit: 0, commandes: 0 };
+                }
+                produits[pId].ca += parseFloat(f.commande.montant || 0);
+                produits[pId].profit += parseFloat(f.profit_net || 0);
+                produits[pId].commandes++;
+            }
+        });
+
+        // Calcul des marges par produit
+        return Object.values(produits).map(p => ({
+            ...p,
+            marge: p.ca > 0 ? ((p.profit / p.ca) * 100).toFixed(2) + '%' : '0%'
+        }));
+    } catch (err) {
+        throw new Error('Erreur profit par produit: ' + err.message);
+    }
+}
+
+
+async function getProfitEvolution(jours = 30) {
+     try {
+        const dateDebut = new Date();
+        dateDebut.setDate(dateDebut.getDate() - jours);
+
+        const { data: finances } = await supabase
+            .from('finance')
+            .select('profit_net, commande:commande_id(montant, date_commande)')
+            .gte('commande.date_commande', dateDebut.toISOString());
+
+        // Filtrer les finances où la jointure a fonctionné (sinon commande est null)
+        const financesValides = finances.filter(f => f.commande && f.commande.date_commande);
+
+        const evolution = {};
+
+        financesValides.forEach(f => {
+            const date = f.commande.date_commande.split('T')[0];
+            if (!evolution[date]) {
+                evolution[date] = { date: date, ca: 0, profit: 0 };
+            }
+            evolution[date].ca += parseFloat(f.commande.montant || 0);
+            evolution[date].profit += parseFloat(f.profit_net || 0);
+        });
+
+        // Transformer l'objet en tableau trié par date
+        return Object.values(evolution).sort((a, b) => a.date.localeCompare(b.date));
+
+     } catch (err) {
+         throw new Error('Erreur évolution finance: ' + err.message);
+     }
+}
+
+module.exports = { calculerProfit, getResumeFinance, getResumeFinanceDetaille, getProfitParProduit, getProfitEvolution };
