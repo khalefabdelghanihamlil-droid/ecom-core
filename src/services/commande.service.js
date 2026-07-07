@@ -207,6 +207,10 @@ console.log("Téléphone :", telephone);
 console.log("Email :", email);
 console.log("Montant :", montant);
 console.log("Order ID :", shopifyOrderId);
+console.log("Étape 1 : Validation OK");
+console.log("Étape 2 : Recherche client");
+console.log("Étape 3 : Client prêt");
+
     // 1. Validation de base
     if (!validerTelephone(telephone) || !validerEmail(email)) {
         throw new Error('Données invalides (téléphone ou email)');
@@ -241,6 +245,8 @@ console.log("Order ID :", shopifyOrderId);
 
     // 4. Moteur Anti-Fraude (Fraud Engine)
     const { decision, reasons, score } = await fraudEngine.evaluateFraudRisk(client, montant, email, ip, deviceFingerprint);
+    console.log("Étape 4 : Fraude évaluée");
+console.log(decision, score);
 
     // Initialisation des données de la commande
     let statut = '';
@@ -282,7 +288,8 @@ console.log("Order ID :", shopifyOrderId);
             console.log('Erreur lors de la demande OTP automatique: ' + err.message);
         }
     }
-
+    console.log("Étape 6 : Fin OK");
+   
     return {
         message: decision === 'BLOCK' ? 'Commande bloquée' : 'Commande traitée',
         decision: decision,
