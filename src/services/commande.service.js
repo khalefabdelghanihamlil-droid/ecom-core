@@ -228,18 +228,37 @@ console.log("Étape 3 : Client prêt");
     }
 
     // 3. Trouver ou Créer Client
-    let { data: client } = await supabase
-        .from('client')
-        .select('*')
-        .eq('telephone', telephone)
-        .single();
+    const { data: clientData, error: clientError } = await supabase
+  .from("client")
+  .select("*")
+  .eq("telephone", telephone)
+  .single();
+
+console.log("Erreur recherche client :", clientError);
+console.log("Client trouvé :", clientData);
+
+let client = clientData;
+if (clientError) {
+    console.log("Code erreur client :", clientError.code);
+    console.log("Message erreur client :", clientError.message);
+}
 
     if (!client) {
-        const { data: nouveauClient } = await supabase
+       const {
+    data: nouveauClient,
+    error: insertClientError
+} = await supabase
+
             .from('client')
             .insert([{ telephone: telephone, email: email, score_risque: 0 }])
             .select()
             .single();
+    console.log("Erreur création client :", insertClientError);
+    console.log("Nouveau client :", nouveauClient);
+    if (insertClientError) {
+        throw insertClientError;
+    }
+
         client = nouveauClient;
     }
 
