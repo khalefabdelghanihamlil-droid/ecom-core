@@ -8,7 +8,7 @@ const domainesJetables = [
 function validerTelephone(telephone) {
   if (!telephone) return false;
 
-  // Shopify envoie un faux numéro lors des tests
+  // Numéro utilisé par Shopify pour les webhooks de test
   if (telephone === "555-555-SHIP") {
     return true;
   }
@@ -23,17 +23,54 @@ function validerEmail(email) {
 
 function emailEstJetable(email) {
   if (!email) return false;
+
   const domaine = email.split('@')[1];
   if (!domaine) return false;
+
   return domainesJetables.includes(domaine.toLowerCase());
 }
 
 async function verifierPaysIP(ip) {
+
+  if (!ip) {
+    console.log("Pas d'IP reçue");
+    return null;
+  }
+
   try {
-    const res = await fetch('http://ip-api.com/json/' + ip + '?fields=countryCode');
+
+    console.log("Vérification IP :", ip);
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 3000);
+
+    const res = await fetch(
+      `https://ip-api.com/json/${ip}?fields=countryCode`,
+      {
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.log("ip-api a répondu :", res.status);
+      return null;
+    }
+
     const data = await res.json();
-    return data.countryCode;
+
+    console.log("Pays détecté :", data.countryCode);
+
+    return data.countryCode || null;
+
   } catch (err) {
+
+    console.log("Erreur IP :", err.message);
+
     return null;
   }
 }
