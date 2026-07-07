@@ -202,12 +202,16 @@ async function getStatistiquesCommandes() {
 // Traiter une nouvelle commande (ex: depuis Shopify Webhook)
 async function processNewOrder(orderData) {
     const { telephone, email, montant, shopifyOrderId, ip, deviceFingerprint } = orderData;
-
+console.log("===== NOUVELLE COMMANDE SHOPIFY =====");
+console.log("Téléphone :", telephone);
+console.log("Email :", email);
+console.log("Montant :", montant);
+console.log("Order ID :", shopifyOrderId);
     // 1. Validation de base
     if (!validerTelephone(telephone) || !validerEmail(email)) {
         throw new Error('Données invalides (téléphone ou email)');
     }
-
+   
     // 2. Idempotence
     const { data: existeDeja } = await supabase
         .from('commande')

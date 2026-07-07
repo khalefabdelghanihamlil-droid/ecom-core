@@ -3,6 +3,9 @@ const { processNewOrder } = require('../services/commande.service');
 async function handleShopifyOrder(req, res) {
   try {
     const order = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    console.log("===== WEBHOOK SHOPIFY =====");
+console.log(JSON.stringify(order, null, 2));
+console.log("===========================");
     
     // Extraire les donnees pertinentes du webhook
     const orderData = {
@@ -13,7 +16,9 @@ async function handleShopifyOrder(req, res) {
       ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
       deviceFingerprint: null
     };
-
+  console.log("Téléphone :", orderData.telephone);
+console.log("Email :", orderData.email);
+console.log("Montant :", orderData.montant); 
     // Déléguer au service de commande orchestrateur
     const resultat = await processNewOrder(orderData);
 
