@@ -47,8 +47,11 @@ async function verifierPaysIP(ip) {
       controller.abort();
     }, 3000);
 
+    // ipwho.is : service gratuit, HTTPS, sans clé API.
+    // Renvoie un code pays ISO-2 dans `country_code` (ex: "DZ"), même format
+    // que l'ancien `countryCode` d'ip-api -> les règles de risque restent identiques.
     const res = await fetch(
-      `https://ip-api.com/json/${ip}?fields=countryCode`,
+      `https://ipwho.is/${ip}`,
       {
         signal: controller.signal
       }
@@ -57,15 +60,21 @@ async function verifierPaysIP(ip) {
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.log("ip-api a répondu :", res.status);
+      console.log("ipwho.is a répondu :", res.status);
       return null;
     }
 
     const data = await res.json();
 
-    console.log("Pays détecté :", data.countryCode);
+    // ipwho.is renvoie success=false pour une IP invalide/privée/introuvable.
+    if (data.success === false) {
+      console.log("ipwho.is : lookup échoué :", data.message || "raison inconnue");
+      return null;
+    }
 
-    return data.countryCode || null;
+    console.log("Pays détecté :", data.country_code);
+
+    return data.country_code || null;
 
   } catch (err) {
 

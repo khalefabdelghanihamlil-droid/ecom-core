@@ -202,134 +202,120 @@ async function getStatistiquesCommandes() {
 // Traiter une nouvelle commande (ex: depuis Shopify Webhook)
 async function processNewOrder(orderData) {
     const { telephone, email, montant, shopifyOrderId, ip, deviceFingerprint } = orderData;
-console.log("===== NOUVELLE COMMANDE SHOPIFY =====");
-console.log("Téléphone :", telephone);
-console.log("Email :", email);
-console.log("Montant :", montant);
-console.log("Order ID :", shopifyOrderId);
-console.log("Étape 1 : Validation OK");
-console.log("Étape 2 : Recherche client");
-console.log("Étape 3 : Client prêt");
 
-    // 1. Validation de base
-    if (!validerTelephone(telephone) || !validerEmail(email)) {
-        throw new Error('Données invalides (téléphone ou email)');
-    }
-   
-    // 2. Idempotence
-    const { data: existeDeja } = await supabase
-        .from('commande')
-        .select('id')
-        .eq('shopify_order_id', shopifyOrderId)
-        .single();
+    // --- LOG ENTRÉE ---
+    console.log("===== NOUVELLE COMMANDE SHOPIFY =====");
+    console.log("[ENTRÉE] tel:", telephone, "| email:", email, "| montant:", montant, "| order_id:", shopifyOrderId);
 
-    if (existeDeja) {
-        return { message: 'Déjà traité', statut: 'ignoree' };
-    }
+    try {
+        // 1. Validation de base
+        if (!validerTelephone(telephone) || !validerEmail(email)) {
+            console.log("[ARRÊT] Données invalides (téléphone ou email)");
+            throw new Error('Données invalides (téléphone ou email)');
+        }
+        console.log("Étape 1 : Validation OK");
 
-    // 3. Trouver ou Créer Client
-    const { data: clientData, error: clientError } = await supabase
-  .from("client")
-  .select("*")
-  .eq("telephone", telephone)
-  .single();
+        // 2. Idempotence (maybeSingle -> null si absent, sans erreur PGRST116)
+        const { data: existeDeja } = await supabase
+            .from('commande')
+            .select('id')
+            .eq('shopify_order_id', shopifyOrderId)
+            .maybeSingle();
 
-console.log("Erreur recherche client :", clientError);
-console.log("Client trouvé :", clientData);
+        if (existeDeja) {
+            console.log("[SORTIE] Idempotence : commande déjà existante ->", existeDeja.id, "(aucune création)");
+            return { message: 'Déjà traité', statut: 'ignoree', commande_id: existeDeja.id };
+        }
+        console.log("Étape 2 : Pas de doublon, poursuite");
 
-let client = clientData;
-if (clientError) {
-    console.log("Code erreur client :", clientError.code);
-    console.log("Message erreur client :", clientError.message);
-}
-
-    if (!client) {
-       const {
-    data: nouveauClient,
-    error: insertClientError
-} = await supabase
-
+        // 3. Trouver ou Créer Client
+        const { data: clientData } = await supabase
             .from('client')
-            .insert([{ telephone: telephone, email: email, score_risque: 0 }])
+            .select('*')
+            .eq('telephone', telephone)
+            .maybeSingle();
+
+        let client = clientData;
+        if (!client) {
+            const { data: nouveauClient, error: insertClientError } = await supabase
+                .from('client')
+                .insert([{ telephone: telephone, email: email, score_risque: 0 }])
+                .select()
+                .single();
+            if (insertClientError) {
+                console.log("[ARRÊT] Échec création client :", insertClientError.message);
+                throw insertClientError;
+            }
+            client = nouveauClient;
+            console.log("Étape 3 : Nouveau client créé", client.id);
+        } else {
+            console.log("Étape 3 : Client existant trouvé", client.id);
+        }
+
+        // 4. Moteur Anti-Fraude (Fraud Engine)
+        const { decision, reasons, score } = await fraudEngine.evaluateFraudRisk(
+            client, montant, email, ip, deviceFingerprint
+        );
+        console.log("Étape 4 : Fraude évaluée ->", decision, "| score:", score);
+
+        // Détermination du statut (comportement métier inchangé)
+        let statut = 'confirmee';
+        let is_fake = false;
+        if (decision === 'BLOCK' || (client && client.blackliste)) {
+            statut = client?.blackliste ? 'rejetee_blacklist' : 'rejetee_auto';
+            is_fake = true;
+        } else if (decision === 'OTP_REQUIRED') {
+            statut = 'en_attente_otp';
+        }
+
+        // 5. Création de la commande
+        const { data: commande, error: insertError } = await supabase
+            .from('commande')
+            .insert([{
+                client_id: client.id,
+                shopify_order_id: shopifyOrderId,
+                montant: montant,
+                ip_address: ip,
+                email: email,
+                score_risque_calcule: score,
+                statut: statut,
+                is_fake: is_fake,
+                fraud_reasons: reasons
+            }])
             .select()
             .single();
-    console.log("Erreur création client :", insertClientError);
-    console.log("Nouveau client :", nouveauClient);
-    if (insertClientError) {
-        throw insertClientError;
-    }
-
-        client = nouveauClient;
-    }
-
-    // 4. Moteur Anti-Fraude (Fraud Engine)
-    console.log("Avant Fraud Engine");
-
-const result = await fraudEngine.evaluateFraudRisk(
-    client,
-    montant,
-    email,
-    ip,
-    deviceFingerprint
-);
-
-console.log("Après Fraud Engine");
-console.log(result);
-
-const { decision, reasons, score } = result;
-    console.log("Étape 4 : Fraude évaluée");
-console.log(decision, score);
-
-    // Initialisation des données de la commande
-    let statut = '';
-    let is_fake = false;
-
-    if (decision === 'BLOCK' || (client && client.blackliste)) {
-        statut = client?.blackliste ? 'rejetee_blacklist' : 'rejetee_auto';
-        is_fake = true;
-    } else if (decision === 'OTP_REQUIRED') {
-        statut = 'en_attente_otp';
-    } else {
-        statut = 'confirmee';
-    }
-
-    // 5. Création de la commande
-    const { data: commande, error: insertError } = await supabase
-        .from('commande')
-        .insert([{
-            client_id: client.id,
-            shopify_order_id: shopifyOrderId,
-            montant: montant,
-            ip_address: ip,
-            email: email,
-            score_risque_calcule: score,
-            statut: statut,
-            is_fake: is_fake,
-            fraud_reasons: reasons
-        }])
-        .select()
-        .single();
-
-    if (insertError) throw insertError;
-
-    // 6. Action Post-Création (OTP)
-    if (decision === 'OTP_REQUIRED') {
-        try {
-            await confirmationService.demanderOTP(commande.id);
-        } catch (err) {
-            console.log('Erreur lors de la demande OTP automatique: ' + err.message);
+        if (insertError) {
+            console.log("[ARRÊT] Échec création commande :", insertError.message);
+            throw insertError;
         }
+        console.log("Étape 5 : Commande créée", commande.id, "| statut:", statut);
+
+        // 6. Action Post-Création (OTP) — non bloquant
+        if (decision === 'OTP_REQUIRED') {
+            try {
+                await confirmationService.demanderOTP(commande.id);
+                console.log("Étape 6 : OTP demandé pour", commande.id);
+            } catch (err) {
+                console.log("Étape 6 : Erreur demande OTP (non bloquant) :", err.message);
+            }
+        }
+
+        // --- LOG SUCCÈS / SORTIE ---
+        console.log("[SUCCÈS] Commande traitée ->", commande.id, "| décision:", decision, "| statut:", statut);
+        return {
+            message: decision === 'BLOCK' ? 'Commande bloquée' : 'Commande traitée',
+            decision: decision,
+            score: score,
+            reasons: reasons,
+            statut: statut,
+            commande_id: commande.id
+        };
+
+    } catch (err) {
+        // --- LOG ERREUR puis PROPAGATION (le contrôleur webhook renvoie 4xx/5xx) ---
+        console.error("[ERREUR] processNewOrder :", err.message);
+        throw err;
     }
-    console.log("Étape 6 : Fin OK");
-   
-    return {
-        message: decision === 'BLOCK' ? 'Commande bloquée' : 'Commande traitée',
-        decision: decision,
-        score: score,
-        reasons: reasons,
-        statut: statut,
-        commande_id: commande.id
-    };
 }
 
 module.exports = {
