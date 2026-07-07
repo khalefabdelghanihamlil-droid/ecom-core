@@ -17,8 +17,8 @@ console.log("===========================");
       deviceFingerprint: null
     };
   console.log("Téléphone :", orderData.telephone);
-console.log("Email :", orderData.email);
-console.log("Montant :", orderData.montant); 
+  console.log("Email :", orderData.email);
+  console.log("Montant :", orderData.montant); 
     // Déléguer au service de commande orchestrateur
     const resultat = await processNewOrder(orderData);
 
