@@ -263,7 +263,20 @@ if (clientError) {
     }
 
     // 4. Moteur Anti-Fraude (Fraud Engine)
-    const { decision, reasons, score } = await fraudEngine.evaluateFraudRisk(client, montant, email, ip, deviceFingerprint);
+    cconsole.log("Avant Fraud Engine");
+
+const result = await fraudEngine.evaluateFraudRisk(
+    client,
+    montant,
+    email,
+    ip,
+    deviceFingerprint
+);
+
+console.log("Après Fraud Engine");
+console.log(result);
+
+const { decision, reasons, score } = result;
     console.log("Étape 4 : Fraude évaluée");
 console.log(decision, score);
 
