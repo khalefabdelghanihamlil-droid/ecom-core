@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const WebSocket = require('ws');
 const path = require('path');
 
 require('dotenv').config({
@@ -8,12 +7,7 @@ require('dotenv').config({
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY,
-  {
-    global: {
-      WebSocket
-    }
-  }
+  process.env.SUPABASE_KEY
 );
 
 module.exports = supabase;
