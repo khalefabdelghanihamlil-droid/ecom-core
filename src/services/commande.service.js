@@ -1,3 +1,7 @@
+const {
+  sendMetaPurchase,
+  sendTikTokPurchase
+} = require('./conversionApi.service');
 const supabase = require('../config/supabase');
 const { validerTelephone, validerEmail } = require('./validationService');
 const fraudEngine = require('./fraudEngine');
@@ -289,6 +293,28 @@ async function processNewOrder(orderData) {
             throw insertError;
         }
         console.log("Étape 5 : Commande créée", commande.id, "| statut:", statut);
+        // Envoi des conversions publicitaires (non bloquant)
+try {
+    await sendMetaPurchase({
+        commande,
+        client,
+        montant,
+        email,
+        telephone
+    });
+
+    await sendTikTokPurchase({
+        commande,
+        client,
+        montant,
+        email,
+        telephone
+    });
+
+    console.log("Étape 5.1 : Conversions envoyées");
+} catch (err) {
+    console.error("Erreur Conversion API :", err.message);
+}
 
         // 6. Action Post-Création (OTP) — non bloquant
         if (decision === 'OTP_REQUIRED') {
