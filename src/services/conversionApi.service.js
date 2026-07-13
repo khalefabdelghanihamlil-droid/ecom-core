@@ -69,7 +69,10 @@ async function sendMetaPurchase({
 
     catch (err) {
 
-        console.error("❌ Meta :", err.response?.data || err.message);
+       console.error("========== META ERROR ==========");
+console.log(err.response?.status);
+console.log(JSON.stringify(err.response?.data, null, 2));
+console.error("===============================");
 
     }
 
@@ -135,7 +138,10 @@ async function sendTikTokPurchase({
 
     catch (err) {
 
-        console.error("❌ TikTok :", err.response?.data || err.message);
+        console.error("========== TIKTOK ERROR ==========");
+console.log(err.response?.status);
+console.log(JSON.stringify(err.response?.data, null, 2));
+console.error("==================================");
 
     }
 
