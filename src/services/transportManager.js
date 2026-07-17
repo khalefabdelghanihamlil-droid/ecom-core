@@ -90,10 +90,13 @@ class TransportManager {
     // ===== DIAGNOSTIC POINT 5 : Ligne exacte du throw =====
     console.error('[DIAG] ❌ AUCUN TRANSPORTEUR — this.transporteurs est VIDE à ce stade');
     console.error('[DIAG] ❌ Relire les logs INITIALISATION ci-dessus pour identifier la cause');
-    throw new Error('Aucun transporteur actif disponible');
+   throw new Error('TEST TRANSPORT MANAGER VERSION ACTUELLE');
   }
 
   async creerColis(commande) {
+     console.log("🔥 CREER COLIS INSTANCE:", Object.keys(this.transporteurs));
+     console.log("🔥 COMMANDE RECUE:", JSON.stringify(commande));
+    
     const choix = this.choisirTransporteur(commande);
     const service = this.transporteurs[choix];
 
@@ -153,4 +156,8 @@ class TransportManager {
   }
 }
 
-module.exports = new TransportManager();
+const manager = new TransportManager();
+
+console.log("🔥 INSTANCE TRANSPORT MANAGER CRÉÉE", Date.now());
+
+module.exports = manager;
